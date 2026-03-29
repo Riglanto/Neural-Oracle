@@ -16,6 +16,7 @@ const config: HardhatUserConfig = {
       accounts: [PRIVATE_KEY],
     },
   },
+  sourcify: { enabled: true },
 };
 
 export default config;
