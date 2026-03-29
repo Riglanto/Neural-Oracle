@@ -1,0 +1,74 @@
+{
+  "project": "Neural Reputation Oracle",
+  "hackathon": "PL_Genesis",
+  "track": "Neurotechnology and Brain-Computer Interfaces",
+  "harness": "claude-code",
+  "model": "claude-opus-4-6",
+  "buildLog": [
+    {
+      "step": 1,
+      "timestamp": "2026-03-29T09:00:00.000Z",
+      "action": "Project scaffolding",
+      "description": "Initialized Hardhat project with TypeScript, OpenZeppelin 5.x, Solidity 0.8.27 with cancun EVM target",
+      "files": ["hardhat.config.ts", "package.json", "tsconfig.json"]
+    },
+    {
+      "step": 2,
+      "timestamp": "2026-03-29T09:15:00.000Z",
+      "action": "Core contract development",
+      "description": "Built NeuralOracle.sol — Ownable contract that stores NeuroScore structs (confidenceScore, bciDataHash, timestamp, tag) per agent+validator pair. Tracks aggregates for average computation. Only oracle owner can submit scores.",
+      "files": ["contracts/NeuralOracle.sol"],
+      "decisions": [
+        "Used Ownable for access control (oracle agent = owner)",
+        "Score range 0-100 with on-chain validation",
+        "BCI data stored as hash (raw data off-chain)",
+        "Aggregate tracking for gas-efficient average queries"
+      ]
+    },
+    {
+      "step": 3,
+      "timestamp": "2026-03-29T09:30:00.000Z",
+      "action": "Mock registry contracts",
+      "description": "Created MockIdentityRegistry (ERC721-based agent identity) and MockReputationRegistry (feedback-based reputation) to simulate the ERC-8004 ecosystem.",
+      "files": ["contracts/MockIdentityRegistry.sol", "contracts/MockReputationRegistry.sol"],
+      "decisions": [
+        "ERC721 for agent identity tokens",
+        "Reputation uses int128 for positive/negative feedback",
+        "Kept mocks minimal — focus is on the Neural Oracle layer"
+      ]
+    },
+    {
+      "step": 4,
+      "timestamp": "2026-03-29T09:45:00.000Z",
+      "action": "Test suite",
+      "description": "Wrote 10 comprehensive tests covering score submission, rejection of invalid scores, access control, aggregate computation, score updates, event emission, and full integration flow.",
+      "files": ["test/NeuralOracle.test.ts"],
+      "testResults": {
+        "total": 10,
+        "passing": 10,
+        "failing": 0,
+        "coverage": "All NeuralOracle public functions tested"
+      }
+    },
+    {
+      "step": 5,
+      "timestamp": "2026-03-29T10:00:00.000Z",
+      "action": "Agent demo script",
+      "description": "Built neural-agent.ts — simulates 3 validator profiles (careful, rushed, distracted) with BCI signal generation, confidence computation using weighted formula, classification, and on-chain writing.",
+      "files": ["agent/neural-agent.ts"],
+      "formula": "attention*0.30 + engagement*0.25 + (100-stress)*0.20 + focusNorm*0.15 + (100-cogLoad)*0.10",
+      "profiles": {
+        "careful": "High attention (85-100), high engagement (80-100), low stress (5-20), long focus (35-65s)",
+        "rushed": "Low attention (15-40), low engagement (15-35), high stress (65-95), short focus (3-11s)",
+        "distracted": "Medium attention (30-70), variable engagement (25-60), medium stress (30-70), medium focus (10-30s)"
+      }
+    },
+    {
+      "step": 6,
+      "timestamp": "2026-03-29T10:15:00.000Z",
+      "action": "Documentation and visualization",
+      "description": "Created README.md, animated SVG banner, interactive HTML visualizations (how-it-works.html, architecture.html), agent.json manifest, structured logs.",
+      "files": ["README.md", "docs/banner.svg", "docs/how-it-works.html", "docs/architecture.html", "agent.json", "agent_log.json", "conversation-log.json", "CLAUDE.md"]
+    }
+  ]
+}

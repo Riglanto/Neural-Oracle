@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neural Reputation Oracle - How It Works</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0a0f;
+    --bg-card: #0d1117;
+    --bg-card-hover: #161b22;
+    --border: #1a1a2e;
+    --border-glow: #30363d;
+    --text: #c9d1d9;
+    --text-dim: #8b949e;
+    --text-bright: #f0f6fc;
+    --green: #00ff88;
+    --green-dim: #00cc6a;
+    --blue: #00ccff;
+    --purple: #8b5cf6;
+    --red: #ff4444;
+    --orange: #ff9500;
+    --yellow: #ffd700;
+    --pink: #ff6eb4;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'SF Pro Display', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    overflow-x: hidden;
+  }
+
+  /* Hero Section */
+  .hero {
+    text-align: center;
+    padding: 60px 20px 40px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle at 50% 50%, rgba(0,255,136,0.03) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(139,92,246,0.03) 0%, transparent 40%),
+                radial-gradient(circle at 20% 80%, rgba(0,204,255,0.03) 0%, transparent 40%);
+    animation: heroBg 15s ease-in-out infinite;
+  }
+
+  @keyframes heroBg {
+    0%, 100% { transform: rotate(0deg); }
+    50% { transform: rotate(5deg); }
+  }
+
+  .hero h1 {
+    font-size: 3rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--green), var(--blue), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+    position: relative;
+  }
+
+  .hero .tagline {
+    font-size: 1.2rem;
+    color: var(--text-dim);
+    margin-bottom: 30px;
+    position: relative;
+  }
+
+  .badge-row {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    position: relative;
+  }
+
+  .badge {
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border: 1px solid;
+  }
+
+  .badge-green { border-color: var(--green); color: var(--green); background: rgba(0,255,136,0.08); }
+  .badge-blue { border-color: var(--blue); color: var(--blue); background: rgba(0,204,255,0.08); }
+  .badge-purple { border-color: var(--purple); color: var(--purple); background: rgba(139,92,246,0.08); }
+
+  /* Sections */
+  .section {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 20px;
+  }
+
+  .section-title {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text-bright);
+    margin-bottom: 8px;
+  }
+
+  .section-subtitle {
+    color: var(--text-dim);
+    margin-bottom: 30px;
+    font-size: 1rem;
+  }
+
+  /* BCI Signal Visualizer */
+  .signal-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .signal-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+
+  .signal-card:hover {
+    border-color: var(--border-glow);
+    box-shadow: 0 0 20px rgba(0,255,136,0.05);
+  }
+
+  .signal-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+
+  .signal-value {
+    font-size: 2rem;
+    font-weight: 800;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    margin-bottom: 8px;
+  }
+
+  .signal-canvas {
+    width: 100%;
+    height: 60px;
+    border-radius: 6px;
+    background: rgba(0,0,0,0.3);
+  }
+
+  /* Validator Profiles */
+  .profile-tabs {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+
+  .profile-tab {
+    padding: 12px 28px;
+    border-radius: 10px;
+    border: 2px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .profile-tab::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: transparent;
+    transition: background 0.3s;
+  }
+
+  .profile-tab.active { border-color: var(--green); color: var(--green); }
+  .profile-tab.active::after { background: var(--green); }
+  .profile-tab[data-profile="rushed"].active { border-color: var(--red); color: var(--red); }
+  .profile-tab[data-profile="rushed"].active::after { background: var(--red); }
+  .profile-tab[data-profile="distracted"].active { border-color: var(--yellow); color: var(--yellow); }
+  .profile-tab[data-profile="distracted"].active::after { background: var(--yellow); }
+
+  .profile-tab:hover { background: var(--bg-card-hover); }
+
+  .profile-detail {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    display: none;
+  }
+
+  .profile-detail.active { display: block; }
+
+  .profile-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .profile-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+  }
+
+  .profile-name {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-bright);
+  }
+
+  .profile-desc {
+    color: var(--text-dim);
+    font-size: 0.9rem;
+  }
+
+  .signal-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .signal-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .signal-bar-label {
+    width: 120px;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    font-family: 'SF Mono', monospace;
+  }
+
+  .signal-bar-track {
+    flex: 1;
+    height: 8px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .signal-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 1s ease-out;
+    position: relative;
+  }
+
+  .signal-bar-fill::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 20px;
+    height: 100%;
+    background: inherit;
+    filter: blur(8px);
+    opacity: 0.6;
+  }
+
+  .signal-bar-value {
+    width: 40px;
+    text-align: right;
+    font-family: 'SF Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  /* Confidence Computation */
+  .computation-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px;
+    text-align: center;
+  }
+
+  .formula-display {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.95rem;
+    color: var(--text-dim);
+    margin-bottom: 24px;
+    line-height: 2.2;
+  }
+
+  .formula-line {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .formula-num {
+    color: var(--green);
+    font-weight: 700;
+    font-size: 1.1rem;
+    min-width: 36px;
+    display: inline-block;
+    transition: color 0.5s;
+  }
+
+  .formula-op { color: var(--text-dim); }
+  .formula-weight { color: var(--purple); }
+  .formula-eq { color: var(--blue); font-weight: 700; font-size: 1.2rem; }
+
+  .score-display {
+    margin: 30px 0;
+  }
+
+  .score-circle {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    margin: 0 auto 20px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+  }
+
+  .score-circle svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: rotate(-90deg);
+  }
+
+  .score-number {
+    font-size: 3rem;
+    font-weight: 800;
+    font-family: 'SF Mono', monospace;
+    position: relative;
+    z-index: 1;
+  }
+
+  .score-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    position: relative;
+    z-index: 1;
+  }
+
+  .classification-badge {
+    display: inline-block;
+    padding: 8px 32px;
+    border-radius: 25px;
+    font-size: 1.1rem;
+    font-weight: 800;
+    letter-spacing: 2px;
+    opacity: 0;
+    transform: scale(0.8);
+    transition: all 0.5s;
+  }
+
+  .classification-badge.visible {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .class-high { background: rgba(0,255,136,0.15); color: var(--green); border: 2px solid var(--green); }
+  .class-medium { background: rgba(255,215,0,0.15); color: var(--yellow); border: 2px solid var(--yellow); }
+  .class-low { background: rgba(255,68,68,0.15); color: var(--red); border: 2px solid var(--red); }
+
+  /* Play Button */
+  .play-section {
+    text-align: center;
+    padding: 40px 0;
+  }
+
+  .play-btn {
+    padding: 16px 48px;
+    font-size: 1.1rem;
+    font-weight: 700;
+    border: 2px solid var(--green);
+    border-radius: 30px;
+    background: rgba(0,255,136,0.1);
+    color: var(--green);
+    cursor: pointer;
+    transition: all 0.3s;
+    letter-spacing: 1px;
+  }
+
+  .play-btn:hover {
+    background: rgba(0,255,136,0.2);
+    box-shadow: 0 0 30px rgba(0,255,136,0.15);
+    transform: translateY(-2px);
+  }
+
+  .play-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* Flow Timeline */
+  .flow-timeline {
+    max-width: 700px;
+    margin: 30px auto 0;
+    text-align: left;
+  }
+
+  .flow-step {
+    display: flex;
+    gap: 16px;
+    padding: 12px 0;
+    opacity: 0.2;
+    transition: opacity 0.5s;
+    align-items: flex-start;
+  }
+
+  .flow-step.active { opacity: 1; }
+  .flow-step.done { opacity: 0.6; }
+
+  .flow-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-top: 4px;
+    flex-shrink: 0;
+    transition: all 0.3s;
+  }
+
+  .flow-dot.pending { background: var(--border); }
+  .flow-dot.running { background: var(--blue); box-shadow: 0 0 12px var(--blue); animation: dotPulse 1s infinite; }
+  .flow-dot.complete { background: var(--green); }
+
+  @keyframes dotPulse {
+    0%, 100% { box-shadow: 0 0 6px var(--blue); }
+    50% { box-shadow: 0 0 18px var(--blue); }
+  }
+
+  .flow-text {
+    font-size: 0.95rem;
+    font-family: 'SF Mono', monospace;
+  }
+
+  .flow-text .validator-name { color: var(--blue); font-weight: 700; }
+  .flow-text .score-val { font-weight: 700; }
+  .flow-text .high { color: var(--green); }
+  .flow-text .low { color: var(--red); }
+  .flow-text .med { color: var(--yellow); }
+
+  /* Architecture Section */
+  .arch-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+  }
+
+  .arch-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+
+  .arch-card:hover { border-color: var(--border-glow); }
+
+  .arch-card-header {
+    padding: 16px 20px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+  }
+
+  .arch-card-title {
+    font-family: 'SF Mono', monospace;
+    font-weight: 700;
+    font-size: 1rem;
+  }
+
+  .arch-card-toggle {
+    color: var(--text-dim);
+    font-size: 1.2rem;
+    transition: transform 0.3s;
+  }
+
+  .arch-card.open .arch-card-toggle { transform: rotate(180deg); }
+
+  .arch-card-body {
+    padding: 0 20px 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s, padding 0.4s;
+  }
+
+  .arch-card.open .arch-card-body {
+    max-height: 500px;
+    padding: 0 20px 20px;
+  }
+
+  .arch-func {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-family: 'SF Mono', monospace;
+    font-size: 0.85rem;
+  }
+
+  .arch-func:last-child { border-bottom: none; }
+  .arch-func-name { color: var(--blue); }
+  .arch-func-desc { color: var(--text-dim); font-family: sans-serif; font-size: 0.8rem; margin-top: 2px; }
+
+  /* Separator */
+  .sep {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    max-width: 1200px;
+    margin: 20px auto;
+  }
+
+  /* Background particles */
+  .particles {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .hero h1 { font-size: 2rem; }
+    .signal-grid { grid-template-columns: 1fr 1fr; }
+    .score-circle { width: 120px; height: 120px; }
+    .score-number { font-size: 2.2rem; }
+  }
+
+  /* Brain canvas */
+  #brainCanvas {
+    display: block;
+    margin: 0 auto 20px;
+    border-radius: 12px;
+  }
+</style>
+</head>
+<body>
+
+<canvas class="particles" id="particleCanvas"></canvas>
+
+<!-- Hero -->
+<div class="hero">
+  <h1>Neural Reputation Oracle</h1>
+  <p class="tagline">Measuring trust with brainwaves.</p>
+  <div class="badge-row">
+    <span class="badge badge-green">10 Tests Passing</span>
+    <span class="badge badge-blue">3 Contracts</span>
+    <span class="badge badge-purple">Neurotechnology Track</span>
+  </div>
+</div>
+
+<!-- Brain Wave Canvas -->
+<div class="section">
+  <canvas id="brainCanvas" width="1000" height="180"></canvas>
+</div>
+
+<div class="sep"></div>
+
+<!-- BCI Signal Visualizer -->
+<div class="section">
+  <h2 class="section-title">Real-Time BCI Signals</h2>
+  <p class="section-subtitle">Simulated neural signals from the active validator profile</p>
+
+  <div class="signal-grid">
+    <div class="signal-card">
+      <div class="signal-label">Attention</div>
+      <div class="signal-value" id="sig-attention" style="color: var(--green)">--</div>
+      <canvas class="signal-canvas" id="canvas-attention"></canvas>
+    </div>
+    <div class="signal-card">
+      <div class="signal-label">Engagement</div>
+      <div class="signal-value" id="sig-engagement" style="color: var(--blue)">--</div>
+      <canvas class="signal-canvas" id="canvas-engagement"></canvas>
+    </div>
+    <div class="signal-card">
+      <div class="signal-label">Stress</div>
+      <div class="signal-value" id="sig-stress" style="color: var(--red)">--</div>
+      <canvas class="signal-canvas" id="canvas-stress"></canvas>
+    </div>
+    <div class="signal-card">
+      <div class="signal-label">Focus Duration</div>
+      <div class="signal-value" id="sig-focus" style="color: var(--purple)">--</div>
+      <canvas class="signal-canvas" id="canvas-focus"></canvas>
+    </div>
+    <div class="signal-card">
+      <div class="signal-label">Cognitive Load</div>
+      <div class="signal-value" id="sig-cogload" style="color: var(--orange)">--</div>
+      <canvas class="signal-canvas" id="canvas-cogload"></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="sep"></div>
+
+<!-- Validator Profiles -->
+<div class="section">
+  <h2 class="section-title">Validator Profiles</h2>
+  <p class="section-subtitle">Click a profile to see how their brain signals differ</p>
+
+  <div class="profile-tabs">
+    <button class="profile-tab active" data-profile="careful" onclick="selectProfile('careful')">Careful Validator</button>
+    <button class="profile-tab" data-profile="rushed" onclick="selectProfile('rushed')">Rushed Validator</button>
+    <button class="profile-tab" data-profile="distracted" onclick="selectProfile('distracted')">Distracted Validator</button>
+  </div>
+
+  <div class="profile-detail active" id="profile-careful">
+    <div class="profile-header">
+      <div class="profile-icon" style="background: rgba(0,255,136,0.15); border: 2px solid var(--green);">
+        <span>&#129504;</span>
+      </div>
+      <div>
+        <div class="profile-name" style="color: var(--green);">Validator Alice</div>
+        <div class="profile-desc">Focused, methodical, deeply engaged in the review process</div>
+      </div>
+    </div>
+    <div class="signal-bars" id="bars-careful"></div>
+  </div>
+
+  <div class="profile-detail" id="profile-rushed">
+    <div class="profile-header">
+      <div class="profile-icon" style="background: rgba(255,68,68,0.15); border: 2px solid var(--red);">
+        <span>&#9889;</span>
+      </div>
+      <div>
+        <div class="profile-name" style="color: var(--red);">Validator Bob</div>
+        <div class="profile-desc">Rushed, stressed, minimal attention to the validation task</div>
+      </div>
+    </div>
+    <div class="signal-bars" id="bars-rushed"></div>
+  </div>
+
+  <div class="profile-detail" id="profile-distracted">
+    <div class="profile-header">
+      <div class="profile-icon" style="background: rgba(255,215,0,0.15); border: 2px solid var(--yellow);">
+        <span>&#128172;</span>
+      </div>
+      <div>
+        <div class="profile-name" style="color: var(--yellow);">Validator Charlie</div>
+        <div class="profile-desc">Intermittently focused, attention wanders, mixed signals</div>
+      </div>
+    </div>
+    <div class="signal-bars" id="bars-distracted"></div>
+  </div>
+</div>
+
+<div class="sep"></div>
+
+<!-- Confidence Computation -->
+<div class="section">
+  <h2 class="section-title">Confidence Computation</h2>
+  <p class="section-subtitle">Watch the formula compute in real-time</p>
+
+  <div class="computation-box">
+    <div class="formula-display">
+      <div class="formula-line">
+        <span class="formula-num" id="f-att">--</span>
+        <span class="formula-op">&times;</span>
+        <span class="formula-weight">0.30</span>
+        <span class="formula-op">&nbsp;+&nbsp;</span>
+        <span class="formula-num" id="f-eng">--</span>
+        <span class="formula-op">&times;</span>
+        <span class="formula-weight">0.25</span>
+        <span class="formula-op">&nbsp;+&nbsp;</span>
+        <span class="formula-num" id="f-str">--</span>
+        <span class="formula-op">&times;</span>
+        <span class="formula-weight">0.20</span>
+        <span class="formula-op">&nbsp;+&nbsp;</span>
+        <span class="formula-num" id="f-foc">--</span>
+        <span class="formula-op">&times;</span>
+        <span class="formula-weight">0.15</span>
+        <span class="formula-op">&nbsp;+&nbsp;</span>
+        <span class="formula-num" id="f-cog">--</span>
+        <span class="formula-op">&times;</span>
+        <span class="formula-weight">0.10</span>
+      </div>
+    </div>
+
+    <div class="score-display">
+      <div class="score-circle" id="scoreCircle">
+        <svg width="160" height="160">
+          <circle cx="80" cy="80" r="72" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="6" />
+          <circle cx="80" cy="80" r="72" fill="none" stroke="var(--green)" stroke-width="6"
+                  stroke-dasharray="452.4" stroke-dashoffset="452.4" stroke-linecap="round" id="scoreArc" />
+        </svg>
+        <div class="score-number" id="scoreNumber">--</div>
+        <div class="score-label">confidence</div>
+      </div>
+      <div class="classification-badge" id="classBadge">--</div>
+    </div>
+  </div>
+</div>
+
+<div class="sep"></div>
+
+<!-- Play Full Flow -->
+<div class="section">
+  <h2 class="section-title">Full Flow Demo</h2>
+  <p class="section-subtitle">Watch all 3 validators process sequentially</p>
+
+  <div class="play-section">
+    <button class="play-btn" id="playBtn" onclick="playFullFlow()">&#9654;&nbsp; Run Full Flow</button>
+  </div>
+
+  <div class="flow-timeline" id="flowTimeline">
+    <div class="flow-step" id="flow-s1">
+      <div class="flow-dot pending" id="dot-s1"></div>
+      <div class="flow-text"><span class="validator-name">Alice (careful)</span> &mdash; signals animate...</div>
+    </div>
+    <div class="flow-step" id="flow-s2">
+      <div class="flow-dot pending" id="dot-s2"></div>
+      <div class="flow-text"><span class="validator-name">Alice</span> &mdash; score computes... <span class="score-val high" id="fscore1">--</span></div>
+    </div>
+    <div class="flow-step" id="flow-s3">
+      <div class="flow-dot pending" id="dot-s3"></div>
+      <div class="flow-text"><span class="validator-name">Alice</span> &mdash; <span class="high" id="fclass1">--</span> &mdash; Written to blockchain</div>
+    </div>
+    <div class="flow-step" id="flow-s4">
+      <div class="flow-dot pending" id="dot-s4"></div>
+      <div class="flow-text"><span class="validator-name">Bob (rushed)</span> &mdash; signals animate...</div>
+    </div>
+    <div class="flow-step" id="flow-s5">
+      <div class="flow-dot pending" id="dot-s5"></div>
+      <div class="flow-text"><span class="validator-name">Bob</span> &mdash; score computes... <span class="score-val low" id="fscore2">--</span></div>
+    </div>
+    <div class="flow-step" id="flow-s6">
+      <div class="flow-dot pending" id="dot-s6"></div>
+      <div class="flow-text"><span class="validator-name">Bob</span> &mdash; <span class="low" id="fclass2">--</span> &mdash; Written to blockchain</div>
+    </div>
+    <div class="flow-step" id="flow-s7">
+      <div class="flow-dot pending" id="dot-s7"></div>
+      <div class="flow-text"><span class="validator-name">Charlie (distracted)</span> &mdash; signals animate...</div>
+    </div>
+    <div class="flow-step" id="flow-s8">
+      <div class="flow-dot pending" id="dot-s8"></div>
+      <div class="flow-text"><span class="validator-name">Charlie</span> &mdash; score computes... <span class="score-val" id="fscore3">--</span></div>
+    </div>
+    <div class="flow-step" id="flow-s9">
+      <div class="flow-dot pending" id="dot-s9"></div>
+      <div class="flow-text"><span class="validator-name">Charlie</span> &mdash; <span id="fclass3">--</span> &mdash; Written to blockchain</div>
+    </div>
+  </div>
+</div>
+
+<div class="sep"></div>
+
+<!-- Architecture -->
+<div class="section">
+  <h2 class="section-title">Contract Architecture</h2>
+  <p class="section-subtitle">Click to expand contract details</p>
+
+  <div class="arch-cards">
+    <div class="arch-card" id="arch-oracle">
+      <div class="arch-card-header" onclick="toggleArch('arch-oracle')">
+        <span class="arch-card-title" style="color: var(--green);">NeuralOracle.sol</span>
+        <span class="arch-card-toggle">&#9660;</span>
+      </div>
+      <div class="arch-card-body">
+        <div class="arch-func">
+          <div class="arch-func-name">submitNeuroValidation(agentId, score, bciHash, tag)</div>
+          <div class="arch-func-desc">Submit a neural confidence score (owner only). Stores NeuroScore struct and updates aggregates.</div>
+        </div>
+        <div class="arch-func">
+          <div class="arch-func-name">getNeuroScore(agentId, validator) -> (score, hash, time, tag)</div>
+          <div class="arch-func-desc">Query the neural score for a specific agent + validator pair.</div>
+        </div>
+        <div class="arch-func">
+          <div class="arch-func-name">getValidators(agentId) -> address[]</div>
+          <div class="arch-func-desc">Get all validators who have scored an agent.</div>
+        </div>
+        <div class="arch-func">
+          <div class="arch-func-name">getAverageScore(agentId) -> uint8</div>
+          <div class="arch-func-desc">Compute the average neural confidence across all validators.</div>
+        </div>
+        <div class="arch-func">
+          <div class="arch-func-name">getScoreCount(agentId) -> uint256</div>
+          <div class="arch-func-desc">Number of distinct validators for this agent.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arch-card" id="arch-identity">
+      <div class="arch-card-header" onclick="toggleArch('arch-identity')">
+        <span class="arch-card-title" style="color: var(--blue);">MockIdentityRegistry.sol</span>
+        <span class="arch-card-toggle">&#9660;</span>
+      </div>
+      <div class="arch-card-body">
+        <div class="arch-func">
+          <div class="arch-func-name">register(uri) -> uint256</div>
+          <div class="arch-func-desc">Mint an ERC721 agent identity token with metadata URI.</div>
+        </div>
+        <div class="arch-func">
+          <div class="arch-func-name">tokenURI(tokenId) -> string</div>
+          <div class="arch-func-desc">Get the metadata URI for a registered agent.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arch-card" id="arch-reputation">
+      <div class="arch-card-header" onclick="toggleArch('arch-reputation')">
+        <span class="arch-card-title" style="color: var(--purple);">MockReputationRegistry.sol</span>
+        <span class="arch-card-toggle">&#9660;</span>
+      </div>
+      <div class="arch-card-body">
+        <div class="arch-func">
+          <div class="arch-func-name">giveFeedback(agentId, value, ...)</div>
+          <div class="arch-func-desc">Submit positive or negative feedback for an agent.</div>
+        </div>
+        <div class="arch-func">
+          <div class="arch-func-name">getSummary(agentId) -> (total, count, average)</div>
+          <div class="arch-func-desc">Aggregate reputation summary with average feedback value.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="height: 60px;"></div>
+
+<script>
+// ── PROFILES ──
+const profiles = {
+  careful:    { attention: 92, engagement: 88, stress: 12, focusDuration: 52, cognitiveLoad: 28 },
+  rushed:     { attention: 25, engagement: 19, stress: 85, focusDuration: 5,  cognitiveLoad: 89 },
+  distracted: { attention: 48, engagement: 38, stress: 52, focusDuration: 16, cognitiveLoad: 58 }
+};
+
+let currentProfile = 'careful';
+let signalHistories = { attention: [], engagement: [], stress: [], focus: [], cogload: [] };
+let animFrame;
+
+// ── SIGNAL CHART RENDERING ──
+const chartColors = {
+  attention: '#00ff88',
+  engagement: '#00ccff',
+  stress: '#ff4444',
+  focus: '#8b5cf6',
+  cogload: '#ff9500'
+};
+
+function initCanvases() {
+  ['attention', 'engagement', 'stress', 'focus', 'cogload'].forEach(name => {
+    const c = document.getElementById('canvas-' + name);
+    c.width = c.offsetWidth * 2;
+    c.height = c.offsetHeight * 2;
+    signalHistories[name] = [];
+  });
+}
+
+function drawChart(name, history, baseVal) {
+  const c = document.getElementById('canvas-' + name);
+  const ctx = c.getContext('2d');
+  const w = c.width, h = c.height;
+  ctx.clearRect(0, 0, w, h);
+
+  if (history.length < 2) return;
+
+  const color = chartColors[name];
+
+  // Glow
+  ctx.beginPath();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 12;
+
+  const step = w / (history.length - 1);
+  for (let i = 0; i < history.length; i++) {
+    const x = i * step;
+    const y = h - (history[i] / 100) * h * 0.8 - h * 0.1;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Fill underneath
+  ctx.shadowBlur = 0;
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, color + '30');
+  grad.addColorStop(1, color + '05');
+  ctx.fillStyle = grad;
+  ctx.fill();
+}
+
+function generateSignalValue(base, noise) {
+  return Math.max(0, Math.min(100, base + (Math.random() - 0.5) * noise));
+}
+
+function tick() {
+  const p = profiles[currentProfile];
+  const noiseMap = {
+    careful: 8,
+    rushed: 15,
+    distracted: 20
+  };
+  const noise = noiseMap[currentProfile];
+
+  const att = generateSignalValue(p.attention, noise);
+  const eng = generateSignalValue(p.engagement, noise);
+  const str = generateSignalValue(p.stress, noise);
+  const foc = generateSignalValue(Math.min(p.focusDuration / 60, 1) * 100, noise);
+  const cog = generateSignalValue(p.cognitiveLoad, noise);
+
+  signalHistories.attention.push(att);
+  signalHistories.engagement.push(eng);
+  signalHistories.stress.push(str);
+  signalHistories.focus.push(foc);
+  signalHistories.cogload.push(cog);
+
+  const maxLen = 80;
+  Object.keys(signalHistories).forEach(k => {
+    if (signalHistories[k].length > maxLen) signalHistories[k].shift();
+  });
+
+  document.getElementById('sig-attention').textContent = Math.round(att);
+  document.getElementById('sig-engagement').textContent = Math.round(eng);
+  document.getElementById('sig-stress').textContent = Math.round(str);
+  document.getElementById('sig-focus').textContent = p.focusDuration + 's';
+  document.getElementById('sig-cogload').textContent = Math.round(cog);
+
+  drawChart('attention', signalHistories.attention, p.attention);
+  drawChart('engagement', signalHistories.engagement, p.engagement);
+  drawChart('stress', signalHistories.stress, p.stress);
+  drawChart('focus', signalHistories.focus, foc);
+  drawChart('cogload', signalHistories.cogload, p.cognitiveLoad);
+
+  updateComputation(p);
+}
+
+// ── PROFILE SELECTION ──
+function selectProfile(profile) {
+  currentProfile = profile;
+  document.querySelectorAll('.profile-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`[data-profile="${profile}"]`).classList.add('active');
+  document.querySelectorAll('.profile-detail').forEach(d => d.classList.remove('active'));
+  document.getElementById('profile-' + profile).classList.add('active');
+
+  Object.keys(signalHistories).forEach(k => signalHistories[k] = []);
+  updateBars(profile);
+}
+
+function updateBars(profile) {
+  const p = profiles[profile];
+  const signals = [
+    { name: 'Attention', val: p.attention, color: '#00ff88' },
+    { name: 'Engagement', val: p.engagement, color: '#00ccff' },
+    { name: 'Stress', val: p.stress, color: '#ff4444' },
+    { name: 'Focus Norm', val: Math.min(p.focusDuration / 60, 1) * 100, color: '#8b5cf6' },
+    { name: 'Cog. Load', val: p.cognitiveLoad, color: '#ff9500' }
+  ];
+
+  const container = document.getElementById('bars-' + profile);
+  container.innerHTML = '';
+  signals.forEach(s => {
+    const row = document.createElement('div');
+    row.className = 'signal-bar-row';
+    row.innerHTML = `
+      <div class="signal-bar-label">${s.name}</div>
+      <div class="signal-bar-track">
+        <div class="signal-bar-fill" style="width: 0%; background: ${s.color};"></div>
+      </div>
+      <div class="signal-bar-value" style="color: ${s.color};">${Math.round(s.val)}</div>
+    `;
+    container.appendChild(row);
+    requestAnimationFrame(() => {
+      row.querySelector('.signal-bar-fill').style.width = s.val + '%';
+    });
+  });
+}
+
+// ── COMPUTATION ──
+function updateComputation(p) {
+  const focusNorm = Math.min(p.focusDuration / 60, 1) * 100;
+  const invStress = 100 - p.stress;
+  const invLoad = 100 - p.cognitiveLoad;
+
+  document.getElementById('f-att').textContent = Math.round(p.attention);
+  document.getElementById('f-eng').textContent = Math.round(p.engagement);
+  document.getElementById('f-str').textContent = Math.round(invStress);
+  document.getElementById('f-foc').textContent = Math.round(focusNorm);
+  document.getElementById('f-cog').textContent = Math.round(invLoad);
+
+  const score = Math.round(
+    p.attention * 0.30 +
+    p.engagement * 0.25 +
+    invStress * 0.20 +
+    focusNorm * 0.15 +
+    invLoad * 0.10
+  );
+  const clamped = Math.max(0, Math.min(100, score));
+
+  document.getElementById('scoreNumber').textContent = clamped;
+
+  const arc = document.getElementById('scoreArc');
+  const circumference = 2 * Math.PI * 72;
+  arc.style.strokeDashoffset = circumference - (clamped / 100) * circumference;
+
+  let cls, clsText, color;
+  if (clamped >= 80) { cls = 'class-high'; clsText = 'HIGH CONFIDENCE'; color = '#00ff88'; }
+  else if (clamped >= 50) { cls = 'class-medium'; clsText = 'MEDIUM CONFIDENCE'; color = '#ffd700'; }
+  else { cls = 'class-low'; clsText = 'LOW CONFIDENCE'; color = '#ff4444'; }
+
+  arc.style.stroke = color;
+  document.getElementById('scoreNumber').style.color = color;
+
+  const badge = document.getElementById('classBadge');
+  badge.className = 'classification-badge visible ' + cls;
+  badge.textContent = clsText;
+}
+
+// ── FULL FLOW ──
+async function playFullFlow() {
+  const btn = document.getElementById('playBtn');
+  btn.disabled = true;
+  btn.textContent = 'Running...';
+
+  // Reset all steps
+  for (let i = 1; i <= 9; i++) {
+    document.getElementById('flow-s' + i).className = 'flow-step';
+    document.getElementById('dot-s' + i).className = 'flow-dot pending';
+  }
+
+  const flowProfiles = [
+    { name: 'careful', steps: [1,2,3], scoreEl: 'fscore1', classEl: 'fclass1' },
+    { name: 'rushed', steps: [4,5,6], scoreEl: 'fscore2', classEl: 'fclass2' },
+    { name: 'distracted', steps: [7,8,9], scoreEl: 'fscore3', classEl: 'fclass3' }
+  ];
+
+  for (const fp of flowProfiles) {
+    selectProfile(fp.name);
+    const p = profiles[fp.name];
+
+    // Step 1: Signals animate
+    await activateStep(fp.steps[0]);
+    await sleep(1500);
+    await completeStep(fp.steps[0]);
+
+    // Step 2: Score computes
+    await activateStep(fp.steps[1]);
+    const focusNorm = Math.min(p.focusDuration / 60, 1) * 100;
+    const score = Math.round(
+      p.attention * 0.30 + p.engagement * 0.25 +
+      (100 - p.stress) * 0.20 + focusNorm * 0.15 +
+      (100 - p.cognitiveLoad) * 0.10
+    );
+    const clamped = Math.max(0, Math.min(100, score));
+    document.getElementById(fp.scoreEl).textContent = clamped + '/100';
+    await sleep(1000);
+    await completeStep(fp.steps[1]);
+
+    // Step 3: Classification + blockchain
+    await activateStep(fp.steps[2]);
+    let cls = clamped >= 80 ? 'HIGH' : clamped >= 50 ? 'MEDIUM' : 'LOW';
+    let cssClass = clamped >= 80 ? 'high' : clamped >= 50 ? 'med' : 'low';
+    const classEl = document.getElementById(fp.classEl);
+    classEl.textContent = cls + ' CONFIDENCE';
+    classEl.className = cssClass;
+    if (fp.scoreEl === 'fscore3') {
+      document.getElementById(fp.scoreEl).className = 'score-val ' + cssClass;
+    }
+    await sleep(1200);
+    await completeStep(fp.steps[2]);
+
+    await sleep(500);
+  }
+
+  btn.disabled = false;
+  btn.textContent = '\u25B6  Run Full Flow';
+}
+
+function activateStep(n) {
+  document.getElementById('flow-s' + n).className = 'flow-step active';
+  document.getElementById('dot-s' + n).className = 'flow-dot running';
+  return sleep(100);
+}
+
+function completeStep(n) {
+  document.getElementById('flow-s' + n).className = 'flow-step done';
+  document.getElementById('dot-s' + n).className = 'flow-dot complete';
+  return sleep(100);
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── ARCHITECTURE TOGGLES ──
+function toggleArch(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
+// ── BRAIN WAVE CANVAS ──
+function drawBrainWaves() {
+  const c = document.getElementById('brainCanvas');
+  const ctx = c.getContext('2d');
+  const w = c.width, h = c.height;
+  let t = 0;
+
+  function frame() {
+    ctx.fillStyle = 'rgba(10, 10, 15, 0.15)';
+    ctx.fillRect(0, 0, w, h);
+
+    const waves = [
+      { color: '#00ff8840', freq: 0.02, amp: 30, speed: 0.03, y: h * 0.3 },
+      { color: '#00ccff30', freq: 0.015, amp: 25, speed: 0.02, y: h * 0.5 },
+      { color: '#8b5cf630', freq: 0.025, amp: 20, speed: 0.04, y: h * 0.7 },
+      { color: '#ff448820', freq: 0.01, amp: 35, speed: 0.015, y: h * 0.4 },
+      { color: '#a855f720', freq: 0.03, amp: 15, speed: 0.05, y: h * 0.6 },
+    ];
+
+    waves.forEach(wave => {
+      ctx.beginPath();
+      ctx.strokeStyle = wave.color;
+      ctx.lineWidth = 2;
+      for (let x = 0; x < w; x++) {
+        const y = wave.y + Math.sin(x * wave.freq + t * wave.speed) * wave.amp
+                  + Math.sin(x * wave.freq * 2.3 + t * wave.speed * 1.7) * wave.amp * 0.3;
+        if (x === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+    });
+
+    // Glowing nodes
+    for (let i = 0; i < 8; i++) {
+      const x = (w / 9) * (i + 1) + Math.sin(t * 0.02 + i) * 20;
+      const y = h / 2 + Math.cos(t * 0.015 + i * 0.7) * 40;
+      const r = 3 + Math.sin(t * 0.05 + i) * 2;
+      const colors = ['#00ff88', '#00ccff', '#8b5cf6', '#a855f7'];
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = colors[i % colors.length];
+      ctx.shadowColor = colors[i % colors.length];
+      ctx.shadowBlur = 15;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    t++;
+    requestAnimationFrame(frame);
+  }
+  frame();
+}
+
+// ── PARTICLES ──
+function initParticles() {
+  const c = document.getElementById('particleCanvas');
+  const ctx = c.getContext('2d');
+  c.width = window.innerWidth;
+  c.height = window.innerHeight;
+
+  const particles = [];
+  for (let i = 0; i < 50; i++) {
+    particles.push({
+      x: Math.random() * c.width,
+      y: Math.random() * c.height,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: (Math.random() - 0.5) * 0.3,
+      r: Math.random() * 2 + 0.5,
+      color: ['#00ff88', '#00ccff', '#8b5cf6'][Math.floor(Math.random() * 3)]
+    });
+  }
+
+  function animParticles() {
+    ctx.clearRect(0, 0, c.width, c.height);
+    particles.forEach(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.x < 0 || p.x > c.width) p.vx *= -1;
+      if (p.y < 0 || p.y > c.height) p.vy *= -1;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = p.color + '20';
+      ctx.fill();
+    });
+    requestAnimationFrame(animParticles);
+  }
+  animParticles();
+
+  window.addEventListener('resize', () => {
+    c.width = window.innerWidth;
+    c.height = window.innerHeight;
+  });
+}
+
+// ── INIT ──
+window.addEventListener('load', () => {
+  initCanvases();
+  updateBars('careful');
+  updateBars('rushed');
+  updateBars('distracted');
+  drawBrainWaves();
+  initParticles();
+
+  setInterval(tick, 150);
+
+  window.addEventListener('resize', () => {
+    initCanvases();
+  });
+});
+</script>
+</body>
+</html>

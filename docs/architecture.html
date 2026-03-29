@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neural Reputation Oracle - Architecture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0a0a0f;
+    --bg-card: #0d1117;
+    --bg-card-hover: #161b22;
+    --border: #1a1a2e;
+    --border-glow: #30363d;
+    --text: #c9d1d9;
+    --text-dim: #8b949e;
+    --text-bright: #f0f6fc;
+    --green: #00ff88;
+    --blue: #00ccff;
+    --purple: #8b5cf6;
+    --red: #ff4444;
+    --orange: #ff9500;
+    --yellow: #ffd700;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'SF Pro Display', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    padding: 0 20px;
+  }
+
+  .header {
+    text-align: center;
+    padding: 50px 0 30px;
+  }
+
+  .header h1 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--green), var(--blue), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 8px;
+  }
+
+  .header p {
+    color: var(--text-dim);
+    font-size: 1.1rem;
+  }
+
+  .back-link {
+    display: inline-block;
+    margin-bottom: 20px;
+    color: var(--blue);
+    text-decoration: none;
+    font-size: 0.9rem;
+    opacity: 0.7;
+    transition: opacity 0.3s;
+  }
+
+  .back-link:hover { opacity: 1; }
+
+  /* Flow diagram */
+  .flow-diagram {
+    max-width: 1000px;
+    margin: 30px auto;
+    padding: 30px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow-x: auto;
+  }
+
+  .flow-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    flex-wrap: wrap;
+    padding: 10px 0;
+  }
+
+  .flow-box {
+    padding: 16px 24px;
+    border-radius: 10px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.9rem;
+    border: 2px solid;
+    min-width: 160px;
+    position: relative;
+  }
+
+  .flow-box-sub {
+    font-size: 0.7rem;
+    font-weight: 400;
+    color: var(--text-dim);
+    margin-top: 4px;
+    font-family: 'SF Mono', monospace;
+  }
+
+  .flow-arrow {
+    padding: 0 16px;
+    font-size: 1.4rem;
+    color: var(--text-dim);
+    animation: arrowPulse 2s ease-in-out infinite;
+  }
+
+  @keyframes arrowPulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+  }
+
+  .fb-green { border-color: var(--green); color: var(--green); background: rgba(0,255,136,0.05); }
+  .fb-blue { border-color: var(--blue); color: var(--blue); background: rgba(0,204,255,0.05); }
+  .fb-purple { border-color: var(--purple); color: var(--purple); background: rgba(139,92,246,0.05); }
+  .fb-orange { border-color: var(--orange); color: var(--orange); background: rgba(255,149,0,0.05); }
+
+  /* Contract cards */
+  .contracts {
+    max-width: 1000px;
+    margin: 40px auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .contract-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+
+  .contract-card:hover {
+    border-color: var(--border-glow);
+  }
+
+  .contract-header {
+    padding: 20px 28px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    transition: background 0.3s;
+  }
+
+  .contract-header:hover {
+    background: var(--bg-card-hover);
+  }
+
+  .contract-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .contract-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    flex-shrink: 0;
+  }
+
+  .contract-name {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-weight: 700;
+    font-size: 1.15rem;
+  }
+
+  .contract-desc {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin-top: 2px;
+  }
+
+  .contract-toggle {
+    font-size: 1.2rem;
+    color: var(--text-dim);
+    transition: transform 0.3s;
+    flex-shrink: 0;
+  }
+
+  .contract-card.open .contract-toggle {
+    transform: rotate(180deg);
+  }
+
+  .contract-body {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.5s ease;
+  }
+
+  .contract-card.open .contract-body {
+    max-height: 1200px;
+  }
+
+  .contract-content {
+    padding: 0 28px 28px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* Struct display */
+  .struct-block {
+    background: rgba(0,0,0,0.3);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-family: 'SF Mono', monospace;
+    font-size: 0.85rem;
+    line-height: 1.8;
+    border-left: 3px solid var(--purple);
+  }
+
+  .struct-title {
+    color: var(--purple);
+    font-weight: 700;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+  }
+
+  .struct-field {
+    color: var(--text-dim);
+  }
+
+  .struct-type { color: var(--blue); }
+  .struct-name { color: var(--text-bright); }
+  .struct-comment { color: #555; font-style: italic; }
+
+  /* Function list */
+  .fn-list {
+    margin-top: 16px;
+  }
+
+  .fn-item {
+    padding: 16px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .fn-item:last-child { border-bottom: none; }
+
+  .fn-signature {
+    font-family: 'SF Mono', monospace;
+    font-size: 0.9rem;
+    margin-bottom: 6px;
+    padding: 8px 12px;
+    background: rgba(0,0,0,0.3);
+    border-radius: 6px;
+    display: inline-block;
+  }
+
+  .fn-name { color: var(--blue); font-weight: 700; }
+  .fn-params { color: var(--text-dim); }
+  .fn-modifier { color: var(--orange); font-style: italic; }
+  .fn-returns { color: var(--green); }
+
+  .fn-desc {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    margin-top: 8px;
+    line-height: 1.6;
+  }
+
+  .fn-tag {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-left: 8px;
+  }
+
+  .tag-write { background: rgba(255,149,0,0.15); color: var(--orange); }
+  .tag-read { background: rgba(0,204,255,0.15); color: var(--blue); }
+
+  /* Events and mappings */
+  .event-block {
+    background: rgba(0,0,0,0.3);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-family: 'SF Mono', monospace;
+    font-size: 0.85rem;
+    line-height: 1.8;
+    border-left: 3px solid var(--orange);
+  }
+
+  .event-title {
+    color: var(--orange);
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .mapping-block {
+    background: rgba(0,0,0,0.3);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-family: 'SF Mono', monospace;
+    font-size: 0.8rem;
+    line-height: 1.8;
+    border-left: 3px solid var(--green);
+  }
+
+  .mapping-title {
+    color: var(--green);
+    font-weight: 700;
+    margin-bottom: 4px;
+    font-size: 0.85rem;
+  }
+
+  /* Connection diagram */
+  .connection-section {
+    max-width: 1000px;
+    margin: 40px auto;
+    padding: 30px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+  }
+
+  .connection-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--text-bright);
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  .connection-grid {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr auto 1fr;
+    gap: 8px;
+    align-items: center;
+    text-align: center;
+  }
+
+  .conn-box {
+    padding: 20px;
+    border-radius: 12px;
+    border: 2px solid;
+  }
+
+  .conn-box h3 {
+    font-family: 'SF Mono', monospace;
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+  }
+
+  .conn-box p {
+    font-size: 0.8rem;
+    color: var(--text-dim);
+  }
+
+  .conn-arrow {
+    font-size: 1.5rem;
+    color: var(--text-dim);
+    animation: arrowPulse 2s ease-in-out infinite;
+  }
+
+  /* Separator */
+  .sep {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    max-width: 1000px;
+    margin: 30px auto;
+  }
+
+  /* Footer */
+  .footer {
+    text-align: center;
+    padding: 40px 0;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .header h1 { font-size: 1.8rem; }
+    .flow-row { flex-direction: column; gap: 8px; }
+    .flow-arrow { transform: rotate(90deg); padding: 4px 0; }
+    .connection-grid { grid-template-columns: 1fr; gap: 12px; }
+    .conn-arrow { transform: rotate(90deg); }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <a href="how-it-works.html" class="back-link">&larr; Back to How It Works</a>
+  <h1>Contract Architecture</h1>
+  <p>Three contracts powering neural trust verification</p>
+</div>
+
+<!-- Flow Diagram -->
+<div class="flow-diagram">
+  <div class="flow-row">
+    <div class="flow-box fb-green">
+      BCI Signals
+      <div class="flow-box-sub">attention, engagement, stress<br>focusDuration, cognitiveLoad</div>
+    </div>
+    <div class="flow-arrow">&#10132;</div>
+    <div class="flow-box fb-blue">
+      Neural Oracle Agent
+      <div class="flow-box-sub">ingest &rarr; analyze &rarr; classify</div>
+    </div>
+    <div class="flow-arrow">&#10132;</div>
+    <div class="flow-box fb-purple">
+      NeuralOracle.sol
+      <div class="flow-box-sub">submitNeuroValidation()</div>
+    </div>
+    <div class="flow-arrow">&#10132;</div>
+    <div class="flow-box fb-orange">
+      ERC-8004 Registry
+      <div class="flow-box-sub">Identity + Reputation</div>
+    </div>
+  </div>
+</div>
+
+<!-- Contract Cards -->
+<div class="contracts">
+
+  <!-- NeuralOracle -->
+  <div class="contract-card open" id="card-oracle">
+    <div class="contract-header" onclick="toggle('card-oracle')">
+      <div class="contract-left">
+        <div class="contract-icon" style="background: rgba(0,255,136,0.1); border: 1px solid rgba(0,255,136,0.3);">
+          <span>&#129504;</span>
+        </div>
+        <div>
+          <div class="contract-name" style="color: var(--green);">NeuralOracle.sol</div>
+          <div class="contract-desc">Core oracle -- BCI signals to on-chain confidence scores (Ownable)</div>
+        </div>
+      </div>
+      <span class="contract-toggle">&#9660;</span>
+    </div>
+    <div class="contract-body">
+      <div class="contract-content">
+
+        <div class="struct-block">
+          <div class="struct-title">struct NeuroScore</div>
+          <div class="struct-field"><span class="struct-type">uint8</span> <span class="struct-name">confidenceScore</span> <span class="struct-comment">// 0-100</span></div>
+          <div class="struct-field"><span class="struct-type">bytes32</span> <span class="struct-name">bciDataHash</span> <span class="struct-comment">// hash of raw BCI data (off-chain)</span></div>
+          <div class="struct-field"><span class="struct-type">uint256</span> <span class="struct-name">timestamp</span></div>
+          <div class="struct-field"><span class="struct-type">string</span> <span class="struct-name">tag</span> <span class="struct-comment">// e.g. "neural-confidence"</span></div>
+          <div class="struct-field"><span class="struct-type">bool</span> <span class="struct-name">exists</span></div>
+        </div>
+
+        <div class="mapping-block">
+          <div class="mapping-title">Storage Mappings</div>
+          <div>mapping(uint256 => mapping(address => NeuroScore)) <span style="color:var(--text-bright)">scores</span></div>
+          <div>mapping(uint256 => address[]) <span style="color:var(--text-bright)">validators</span></div>
+          <div>mapping(uint256 => uint256) <span style="color:var(--text-bright)">totalScore</span></div>
+          <div>mapping(uint256 => uint256) <span style="color:var(--text-bright)">scoreCount</span></div>
+        </div>
+
+        <div class="event-block">
+          <div class="event-title">event NeuroValidationSubmitted</div>
+          <div>(uint256 indexed agentId, address indexed validator, uint8 confidenceScore, string tag)</div>
+        </div>
+
+        <div class="fn-list">
+          <div class="fn-item">
+            <div class="fn-signature">
+              <span class="fn-name">submitNeuroValidation</span><span class="fn-params">(uint256 agentId, uint8 confidenceScore, bytes32 bciDataHash, string tag)</span>
+              <span class="fn-modifier"> onlyOwner</span>
+              <span class="fn-tag tag-write">write</span>
+            </div>
+            <div class="fn-desc">Submit a neural confidence score for an agent validation. Requires score 0-100. Updates aggregate totals. If validator already scored this agent, the old score is replaced and aggregates are recalculated.</div>
+          </div>
+
+          <div class="fn-item">
+            <div class="fn-signature">
+              <span class="fn-name">getNeuroScore</span><span class="fn-params">(uint256 agentId, address validator)</span>
+              <span class="fn-returns"> &rarr; (uint8, bytes32, uint256, string)</span>
+              <span class="fn-tag tag-read">view</span>
+            </div>
+            <div class="fn-desc">Returns the confidence score, BCI data hash, timestamp, and tag for a specific agent + validator pair.</div>
+          </div>
+
+          <div class="fn-item">
+            <div class="fn-signature">
+              <span class="fn-name">getValidators</span><span class="fn-params">(uint256 agentId)</span>
+              <span class="fn-returns"> &rarr; address[]</span>
+              <span class="fn-tag tag-read">view</span>
+            </div>
+            <div class="fn-desc">Returns all validator addresses that have submitted scores for the given agent.</div>
+          </div>
+
+          <div class="fn-item">
+            <div class="fn-signature">
+              <span class="fn-name">getAverageScore</span><span class="fn-params">(uint256 agentId)</span>
+              <span class="fn-returns"> &rarr; uint8</span>
+              <span class="fn-tag tag-read">view</span>
+            </div>
+            <div class="fn-desc">Computes the average neural confidence across all validators for an agent. Returns 0 if no scores exist.</div>
+          </div>
+
+          <div class="fn-item">
+            <div class="fn-signature">
+              <span class="fn-name">getScoreCount</span><span class="fn-params">(uint256 agentId)</span>
+              <span class="fn-returns"> &rarr; uint256</span>
+              <span class="fn-tag tag-read">view</span>
+            </div>
+            <div class="fn-desc">Returns the number of distinct validators who have scored this agent.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MockIdentityRegistry -->
+  <div class="contract-card" id="card-identity">
+    <div class="contract-header" onclick="toggle('card-identity')">
+      <div class="contract-left">
+        <div class="contract-icon" style="background: rgba(0,204,255,0.1); border: 1px solid rgba(0,204,255,0.3);">
+          <span>&#128100;</span>
+        </div>
+        <div>
+          <div class="contract-name" style="color: var(--blue);">MockIdentityRegistry.sol</div>
+          <div class="contract-desc">ERC721-based agent identity -- "Agent Identity" (AGENT)</div>
+        </div>
+      </div>
+      <span class="contract-toggle">&#9660;</span>
+    </div>
+    <div class="contract-body">
+      <div class="contract-content">
+
+        <div class="struct-block" style="border-left-color: var(--blue);">
+          <div class="struct-title" style="color: var(--blue);">Inherits: ERC721("Agent Identity", "AGENT")</div>
+          <div class="struct-field"><span class="struct-type">uint256</span> <span class="struct-name">_nextTokenId</span> <span class="struct-comment">// auto-incrementing</span></div>
+          <div class="struct-field"><span class="struct-type">mapping(uint256 => string)</span> <span class="struct-name">_uris</span> <span class="struct-comment">// metadata URIs</span></div>
+        </div>
+
+        <div class="fn-list">
+          <div class="fn-item">
+            <div class="fn-signature">
+              <span class="fn-name">register</span><span class="fn-params">(string uri)</span>
+              <span class="fn-returns"> &rarr; uint256</span>
+              <span class="fn-tag tag-write">write</span>
+            </div>
+            <div class="fn-desc">Mints a new ERC721 token to the caller with the given metadata URI. Returns the new token ID. Used by both the oracle agent and reviewed agents to establish on-chain identity.</div>
+          </div>
+
+          <div class="fn-item">
+            <div class="fn-signature">
+              <span class="fn-name">tokenURI</span><span class="fn-params">(uint256 tokenId)</span>
+              <span class="fn-returns"> &rarr; string</span>
+              <span class="fn-tag tag-read">view</span>
+            </div>
+            <div class="fn-desc">Returns the metadata URI for a registered agent. Reverts if token does not exist.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MockReputationRegistry -->
+  <div class="contract-card" id="card-reputation">
+    <div class="contract-header" onclick="toggle('card-reputation')">
+      <div class="contract-left">
+        <div class="contract-icon" style="background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.3);">
+          <span>&#11088;</span>
+        </div>
+        <div>
+          <div class="contract-name" style="color: var(--purple);">MockReputationRegistry.sol</div>
+          <div class="contract-desc">Feedback-based reputation with aggregate summaries</div>
+        </div>
+      </div>
+      <span class="contract-toggle">&#9660;</span>
+    </div>
+    <div class="contract-body">
+      <div class="contract-content">
+
+        <div class="struct-block">
+          <div class="struct-title">struct FeedbackEntry</div>
+          <div class="struct-field"><span class="struct-type">address</span> <span class="struct-name">client</span></div>
+          <div class="struct-field"><span class="struct-type">int128</span> <span class="struct-name">value</span> <span class="struct-comment">// positive or negative</span></div>
+          <div class="struct-field"><span class="struct-type">bool</span> <span class="struct-name">revoked</span></div>
+        </div>
+
+        <div class="fn-list">
+          <div class="fn-item">
+            <div class="fn-signature">
+              <span class="fn-name">giveFeedback</span><span class="fn-params">(uint256 agentId, int128 value, uint8, string, string)</span>
+              <span class="fn-tag tag-write">write</span>
+            </div>
+            <div class="fn-desc">Submit feedback for an agent. The value can be positive or negative. Extra parameters reserved for future use (category, comment).</div>
+          </div>
+
+          <div class="fn-item">
+            <div class="fn-signature">
+              <span class="fn-name">getSummary</span><span class="fn-params">(uint256 agentId)</span>
+              <span class="fn-returns"> &rarr; (int128 totalValue, uint256 feedbackCount, int128 averageValue)</span>
+              <span class="fn-tag tag-read">view</span>
+            </div>
+            <div class="fn-desc">Returns aggregate reputation: total feedback value, number of non-revoked entries, and average value. Skips revoked feedback in computation.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="sep"></div>
+
+<!-- How they connect -->
+<div class="connection-section">
+  <div class="connection-title">How They Connect</div>
+  <div class="connection-grid">
+    <div class="conn-box fb-blue">
+      <h3 style="color: var(--blue);">MockIdentityRegistry</h3>
+      <p>Agent registers on-chain identity (ERC721 token). The token ID becomes the agentId used across all contracts.</p>
+    </div>
+    <div class="conn-arrow">&#10132;</div>
+    <div class="conn-box fb-purple">
+      <h3 style="color: var(--purple);">MockReputationRegistry</h3>
+      <p>Validators give feedback using the agentId from the identity registry. This is the "traditional" reputation layer.</p>
+    </div>
+    <div class="conn-arrow">&#10132;</div>
+    <div class="conn-box fb-green">
+      <h3 style="color: var(--green);">NeuralOracle</h3>
+      <p>The oracle adds a BCI confidence layer on top. It scores HOW the validation was done, not just the result. Same agentId links all three.</p>
+    </div>
+  </div>
+</div>
+
+<div class="sep"></div>
+
+<div style="max-width: 1000px; margin: 20px auto; padding: 20px 28px; background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px;">
+  <h3 style="color: var(--text-bright); margin-bottom: 12px;">Key Design Decisions</h3>
+  <ul style="list-style: none; line-height: 2;">
+    <li style="color: var(--text-dim);"><span style="color: var(--green);">&#9679;</span> <strong style="color: var(--text);">Ownable access control</strong> -- Only the oracle agent can submit scores, preventing manipulation</li>
+    <li style="color: var(--text-dim);"><span style="color: var(--blue);">&#9679;</span> <strong style="color: var(--text);">BCI data as hash</strong> -- Raw neural data stored off-chain, only the hash goes on-chain for verification</li>
+    <li style="color: var(--text-dim);"><span style="color: var(--purple);">&#9679;</span> <strong style="color: var(--text);">Gas-efficient aggregates</strong> -- totalScore and scoreCount tracked incrementally, no loops needed for averages</li>
+    <li style="color: var(--text-dim);"><span style="color: var(--orange);">&#9679;</span> <strong style="color: var(--text);">Score updates</strong> -- Resubmitting for the same agent recalculates aggregates correctly (subtract old, add new)</li>
+    <li style="color: var(--text-dim);"><span style="color: var(--yellow);">&#9679;</span> <strong style="color: var(--text);">Solidity 0.8.27</strong> -- Cancun EVM target with OpenZeppelin 5.x for modern security patterns</li>
+  </ul>
+</div>
+
+<div class="footer">
+  Neural Reputation Oracle &mdash; PL_Genesis &mdash; Neurotechnology Track
+</div>
+
+<script>
+function toggle(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+</script>
+</body>
+</html>

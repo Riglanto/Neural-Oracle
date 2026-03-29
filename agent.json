@@ -1,0 +1,9 @@
+{
+  "name": "Neural Reputation Oracle",
+  "description": "BCI-powered trust scores for autonomous agents",
+  "version": "1.0.0",
+  "operator": { "wallet": "0x2e5fEA809Cc4679DdEc0c6cEB5F9f5B34Ce6263F" },
+  "tools": ["NeuralOracle.sol", "MockIdentityRegistry", "MockReputationRegistry"],
+  "capabilities": { "bciProcessing": true, "confidenceScoring": true, "validationWriting": true },
+  "techStack": { "language": "TypeScript + Solidity", "framework": "Hardhat", "harness": "claude-code", "model": "claude-opus-4-6" }
+}

@@ -1,0 +1,210 @@
+{
+  "agent": "Neural Reputation Oracle",
+  "version": "1.0.0",
+  "startTime": "2026-03-29T10:00:00.000Z",
+  "endTime": "2026-03-29T10:02:34.000Z",
+  "epochs": [
+    {
+      "epoch": 1,
+      "phase": "bootstrap",
+      "timestamp": "2026-03-29T10:00:00.000Z",
+      "action": "Deploy contracts and register oracle identity",
+      "details": {
+        "contracts": ["MockIdentityRegistry", "MockReputationRegistry", "NeuralOracle"],
+        "oracleAgentId": 0,
+        "identity": "data:application/json,%7B%22name%22%3A%22Neural%20Reputation%20Oracle%22%2C%22type%22%3A%22neural-oracle%22%7D"
+      },
+      "status": "success"
+    },
+    {
+      "epoch": 2,
+      "phase": "register",
+      "timestamp": "2026-03-29T10:00:12.000Z",
+      "action": "Register 3 test agents for validation",
+      "details": {
+        "agents": [
+          { "id": 1, "uri": "ipfs://QmAgent1", "profile": "careful" },
+          { "id": 2, "uri": "ipfs://QmAgent2", "profile": "rushed" },
+          { "id": 3, "uri": "ipfs://QmAgent3", "profile": "distracted" }
+        ]
+      },
+      "status": "success"
+    },
+    {
+      "epoch": 3,
+      "phase": "ingest",
+      "timestamp": "2026-03-29T10:00:30.000Z",
+      "action": "Simulate BCI signals for Validator Alice (careful reviewer)",
+      "details": {
+        "agentId": 1,
+        "validator": "Validator Alice",
+        "profile": "careful",
+        "signals": {
+          "attention": 92,
+          "engagement": 88,
+          "stress": 12,
+          "focusDuration": 52,
+          "cognitiveLoad": 28
+        }
+      },
+      "status": "success"
+    },
+    {
+      "epoch": 4,
+      "phase": "analyze",
+      "timestamp": "2026-03-29T10:00:45.000Z",
+      "action": "Compute confidence score for Agent #1",
+      "details": {
+        "formula": "attention*0.30 + engagement*0.25 + (100-stress)*0.20 + focusNorm*0.15 + (100-cogLoad)*0.10",
+        "computation": {
+          "attentionComponent": 27.6,
+          "engagementComponent": 22.0,
+          "stressComponent": 17.6,
+          "focusComponent": 13.0,
+          "loadComponent": 7.2
+        },
+        "rawScore": 87.4,
+        "clampedScore": 87,
+        "classification": "HIGH"
+      },
+      "status": "success"
+    },
+    {
+      "epoch": 5,
+      "phase": "write",
+      "timestamp": "2026-03-29T10:00:52.000Z",
+      "action": "Submit neural validation for Agent #1 on-chain",
+      "details": {
+        "agentId": 1,
+        "score": 87,
+        "tag": "neural-confidence",
+        "bciDataHash": "0xa1b2c3...hashed",
+        "txStatus": "confirmed"
+      },
+      "status": "success"
+    },
+    {
+      "epoch": 6,
+      "phase": "ingest",
+      "timestamp": "2026-03-29T10:01:10.000Z",
+      "action": "Simulate BCI signals for Validator Bob (rushed reviewer)",
+      "details": {
+        "agentId": 2,
+        "validator": "Validator Bob",
+        "profile": "rushed",
+        "signals": {
+          "attention": 28,
+          "engagement": 22,
+          "stress": 82,
+          "focusDuration": 6,
+          "cognitiveLoad": 88
+        }
+      },
+      "status": "success"
+    },
+    {
+      "epoch": 7,
+      "phase": "analyze",
+      "timestamp": "2026-03-29T10:01:25.000Z",
+      "action": "Compute confidence score for Agent #2",
+      "details": {
+        "formula": "attention*0.30 + engagement*0.25 + (100-stress)*0.20 + focusNorm*0.15 + (100-cogLoad)*0.10",
+        "computation": {
+          "attentionComponent": 8.4,
+          "engagementComponent": 5.5,
+          "stressComponent": 3.6,
+          "focusComponent": 1.5,
+          "loadComponent": 1.2
+        },
+        "rawScore": 20.2,
+        "clampedScore": 20,
+        "classification": "LOW"
+      },
+      "status": "success"
+    },
+    {
+      "epoch": 8,
+      "phase": "write",
+      "timestamp": "2026-03-29T10:01:32.000Z",
+      "action": "Submit neural validation for Agent #2 on-chain",
+      "details": {
+        "agentId": 2,
+        "score": 20,
+        "tag": "neural-confidence",
+        "bciDataHash": "0xd4e5f6...hashed",
+        "txStatus": "confirmed",
+        "alert": "LOW confidence validation flagged"
+      },
+      "status": "success"
+    },
+    {
+      "epoch": 9,
+      "phase": "ingest",
+      "timestamp": "2026-03-29T10:01:50.000Z",
+      "action": "Simulate BCI signals for Validator Charlie (distracted reviewer)",
+      "details": {
+        "agentId": 3,
+        "validator": "Validator Charlie",
+        "profile": "distracted",
+        "signals": {
+          "attention": 52,
+          "engagement": 41,
+          "stress": 48,
+          "focusDuration": 18,
+          "cognitiveLoad": 55
+        }
+      },
+      "status": "success"
+    },
+    {
+      "epoch": 10,
+      "phase": "analyze",
+      "timestamp": "2026-03-29T10:02:05.000Z",
+      "action": "Compute confidence score for Agent #3",
+      "details": {
+        "formula": "attention*0.30 + engagement*0.25 + (100-stress)*0.20 + focusNorm*0.15 + (100-cogLoad)*0.10",
+        "computation": {
+          "attentionComponent": 15.6,
+          "engagementComponent": 10.25,
+          "stressComponent": 10.4,
+          "focusComponent": 4.5,
+          "loadComponent": 4.5
+        },
+        "rawScore": 45.25,
+        "clampedScore": 45,
+        "classification": "LOW"
+      },
+      "status": "success"
+    },
+    {
+      "epoch": 11,
+      "phase": "write",
+      "timestamp": "2026-03-29T10:02:12.000Z",
+      "action": "Submit neural validation for Agent #3 on-chain",
+      "details": {
+        "agentId": 3,
+        "score": 45,
+        "tag": "neural-confidence",
+        "bciDataHash": "0x789abc...hashed",
+        "txStatus": "confirmed"
+      },
+      "status": "success"
+    },
+    {
+      "epoch": 12,
+      "phase": "summary",
+      "timestamp": "2026-03-29T10:02:34.000Z",
+      "action": "Final results summary",
+      "details": {
+        "results": [
+          { "agentId": 1, "averageScore": 87, "validations": 1, "classification": "HIGH" },
+          { "agentId": 2, "averageScore": 20, "validations": 1, "classification": "LOW" },
+          { "agentId": 3, "averageScore": 45, "validations": 1, "classification": "LOW" }
+        ],
+        "totalValidations": 3,
+        "logEntries": 18
+      },
+      "status": "success"
+    }
+  ]
+}
